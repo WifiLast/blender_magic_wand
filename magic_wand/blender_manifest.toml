@@ -1,0 +1,14 @@
+schema_version = "1.0.0"
+id = "magic_wand"
+name = "Magic Wand"
+version = "0.1.0"
+tagline = "Topology-aware mesh selection for professional 3D workflows"
+maintainer = "Wiffzackius"
+type = "add-on"
+tags = ["Mesh"]
+blender_version_min = "4.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
+website = "https://github.com/WifiLast/blender_magic_wand"
+copyright = [
+    "2026 Martin St.",
+]
