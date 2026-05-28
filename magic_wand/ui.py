@@ -46,7 +46,8 @@ class SMART3DWAND_PT_main(Panel):
         layout.separator()
         layout.label(text="Interactive controls:")
         layout.label(text="Left click: commit")
-        layout.label(text="Wheel: grow/shrink threshold")
+        layout.label(text="Wheel: active threshold")
+        layout.label(text="Ctrl + Wheel: other threshold")
         layout.label(text="A / S / R: add / subtract / replace")
         layout.label(text="Shift: larger wheel steps")
 
@@ -59,6 +60,8 @@ class SMART3DWAND_PT_main(Panel):
         box = layout.box()
         box.label(text="Similarity Controls")
         box.prop(props, "angle_threshold")
+        box.prop(props, "use_connected_vertex_threshold", toggle=True)
+        box.prop(props, "max_connected_vertices")
         box.prop(props, "curvature_sensitivity")
         box.prop(props, "max_growth_distance")
         box.prop(props, "tolerance_falloff")

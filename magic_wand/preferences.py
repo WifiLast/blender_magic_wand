@@ -67,6 +67,28 @@ class SceneProperties(PropertyGroup):
         max=180.0,
     )
 
+    use_connected_vertex_threshold: BoolProperty(
+        name="Connected Vertex Threshold",
+        description="Also limit growth by the number of connected vertices in the region",
+        default=True,
+    )
+
+    max_connected_vertices: FloatProperty(
+        name="Max Connected Vertices",
+        description="Maximum number of unique vertices allowed in the grown region",
+        default=256,
+        min=1,
+        soft_max=4096,
+    )
+
+    vertex_distance_bias: FloatProperty(
+        name="Vertex Distance Bias",
+        description="Prioritize vertices closer to seed point (higher = stricter at distance)",
+        default=0.5,
+        min=0.0,
+        max=1.0,
+    )
+
     curvature_sensitivity: FloatProperty(
         name="Curvature Sensitivity",
         description="How aggressively local curvature changes block growth",

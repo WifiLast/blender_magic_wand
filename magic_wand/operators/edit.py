@@ -24,6 +24,7 @@ class _PreviewState:
     seed_vertex: int | None = None
     region: RegionGrowResult | None = None
     mouse_position: tuple[int, int] | None = None
+    lock_mode: bool = False
 
 
 @dataclass(slots=True)
@@ -97,6 +98,7 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         self._bvh = BVHTree.FromBMesh(self._bm)
         self._analysis = GLOBAL_ANALYSIS_CACHE.get_analysis(context, obj, bm=self._bm)
         self._preview = _PreviewState()
+        self._lock_points: set[int] = set()
         self._preview_handle = bpy.types.SpaceView3D.draw_handler_add(
             self._draw_preview,
             (context,),
@@ -130,7 +132,28 @@ class MESH_OT_smart_3d_magic_wand(Operator):
             self._finish(context)
             return {"CANCELLED"}
 
-        if event.type in {"RET", "NUMPAD_ENTER", "SPACE", "LEFTMOUSE"} and event.value == "PRESS":
+        if event.value == "PRESS" and event.type == "L":
+            self._preview.lock_mode = not self._preview.lock_mode
+            if self._preview.lock_mode:
+                props = context.scene.smart_3d_magic_wand
+                props.angle_threshold = 50.0
+                current_selection = self._capture_selection()
+                self._lock_points.update(current_selection["verts"])
+                self._update_from_event(context, event, force=True)
+            context.area.tag_redraw()
+            return {"RUNNING_MODAL"}
+
+        if event.type == "LEFTMOUSE" and event.value == "PRESS":
+            if self._preview.lock_mode:
+                self._toggle_lock_point(context, event)
+                context.area.tag_redraw()
+                return {"RUNNING_MODAL"}
+            else:
+                self._apply_preview_selection(context)
+                self._finish(context)
+                return {"FINISHED"}
+
+        if event.type in {"RET", "NUMPAD_ENTER", "SPACE"} and event.value == "PRESS":
             self._apply_preview_selection(context)
             self._finish(context)
             return {"FINISHED"}
@@ -152,6 +175,17 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         if event.value == "PRESS" and event.type == "X":
             props = context.scene.smart_3d_magic_wand
             props.connected_only = not props.connected_only
+            self._update_from_event(context, event, force=True)
+            return {"RUNNING_MODAL"}
+
+        if event.value == "PRESS" and event.type == "V":
+            props = context.scene.smart_3d_magic_wand
+            props.use_connected_vertex_threshold = not props.use_connected_vertex_threshold
+            self._update_from_event(context, event, force=True)
+            return {"RUNNING_MODAL"}
+
+        if event.value == "PRESS" and event.type == "C":
+            self._lock_points.clear()
             self._update_from_event(context, event, force=True)
             return {"RUNNING_MODAL"}
 
@@ -177,6 +211,9 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         layout.prop(self, "selection_behavior")
         layout.separator()
         layout.prop(props, "angle_threshold")
+        layout.prop(props, "use_connected_vertex_threshold", toggle=True)
+        layout.prop(props, "max_connected_vertices")
+        layout.prop(props, "vertex_distance_bias")
         layout.prop(props, "curvature_sensitivity")
         layout.prop(props, "max_growth_distance")
         layout.prop(props, "tolerance_falloff")
@@ -229,11 +266,22 @@ class MESH_OT_smart_3d_magic_wand(Operator):
 
         props = context.scene.smart_3d_magic_wand
         region_size = len(self._preview.region.selected_faces) if self._preview.region else 0
+        region_vertices = len(self._preview.region.selected_vertices) if self._preview.region else 0
+        threshold_label = (
+            f"Connected vertices: {props.max_connected_vertices}"
+            if props.use_connected_vertex_threshold
+            else f"Angle: {props.angle_threshold:.1f}°"
+        )
+        other_label = "angle" if props.use_connected_vertex_threshold else "connected vertices"
+        lock_mode_text = " | LOCK MODE (click to add/remove)" if self._preview.lock_mode else ""
+        lock_count_text = f" | Lock points: {len(self._lock_points)}" if self._lock_points else ""
+        clear_locks_text = " | C: clear locks" if self._lock_points else ""
         context.workspace.status_text_set(
             (
-                f"Smart 3D Magic Wand | Threshold: {props.angle_threshold:.1f}° | "
+                f"Smart 3D Magic Wand | {threshold_label} | "
                 f"Behavior: {self.selection_behavior} | Region faces: {region_size} | "
-                "Wheel: threshold | A/S/R/I: add/subtract/replace/intersect | Esc: cancel"
+                f"Region verts: {region_vertices} | Wheel: active | Ctrl+Wheel: {other_label} | "
+                f"A/S/R/I: add/subtract/replace/intersect | V: toggle vertex limit | L: lock mode{lock_mode_text}{lock_count_text}{clear_locks_text} | Esc: cancel"
             )
         )
 
@@ -260,6 +308,8 @@ class MESH_OT_smart_3d_magic_wand(Operator):
             self.output_mode,
             self.selection_behavior,
             self._q(props.angle_threshold),
+            props.use_connected_vertex_threshold,
+            self._q(props.max_connected_vertices),
             self._q(props.curvature_sensitivity),
             self._q(props.max_growth_distance),
             props.material_lock,
@@ -268,6 +318,7 @@ class MESH_OT_smart_3d_magic_wand(Operator):
             props.connected_only,
             self._q(props.tolerance_falloff),
             self._q(props.vertex_color_tolerance),
+            self._q(props.vertex_distance_bias),
         )
 
     def _resolve_seed_mode(self, context) -> SeedMode:
@@ -296,6 +347,8 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         props = context.scene.smart_3d_magic_wand
         return SimilaritySettings(
             angle_threshold=props.angle_threshold,
+            use_connected_vertex_threshold=props.use_connected_vertex_threshold,
+            max_connected_vertices=int(props.max_connected_vertices),
             curvature_sensitivity=props.curvature_sensitivity,
             max_growth_distance=props.max_growth_distance,
             material_lock=props.material_lock,
@@ -304,6 +357,8 @@ class MESH_OT_smart_3d_magic_wand(Operator):
             connected_only=props.connected_only,
             tolerance_falloff=props.tolerance_falloff,
             vertex_color_tolerance=props.vertex_color_tolerance,
+            vertex_distance_bias=props.vertex_distance_bias,
+            lock_points=frozenset(self._lock_points),
             use_face_normal=props.use_face_normal,
             use_curvature=props.use_curvature,
             use_material=props.use_material,
@@ -346,6 +401,34 @@ class MESH_OT_smart_3d_magic_wand(Operator):
             return face.index, None, closest_vert.index
 
         return face.index, None, None
+
+    def _toggle_lock_point(self, context, event):
+        region = context.region
+        rv3d = context.region_data
+        if region is None or rv3d is None:
+            return
+
+        coord = (event.mouse_region_x, event.mouse_region_y)
+        origin_world = view3d_utils.region_2d_to_origin_3d(region, rv3d, coord)
+        direction_world = view3d_utils.region_2d_to_vector_3d(region, rv3d, coord)
+        origin = self._obj.matrix_world.inverted() @ origin_world
+        direction = (self._obj.matrix_world.inverted().to_3x3() @ direction_world).normalized()
+        location, normal, face_index, distance = self._bvh.ray_cast(origin, direction)
+        if face_index is None:
+            return
+
+        face = self._bm.faces[face_index]
+        closest_vert = min(
+            face.verts,
+            key=lambda vert: (vert.co - location).length,
+        )
+
+        if closest_vert.index in self._lock_points:
+            self._lock_points.discard(closest_vert.index)
+        else:
+            self._lock_points.add(closest_vert.index)
+
+        self._update_from_event(context, event, force=True)
 
     def _build_preview(self, context, event, *, force: bool = False):
         seed_face, seed_edge, seed_vertex = self._pick_seed(context, event)
@@ -390,11 +473,23 @@ class MESH_OT_smart_3d_magic_wand(Operator):
 
     def _adjust_threshold(self, context, *, grow: bool, event):
         props = context.scene.smart_3d_magic_wand
+        adjust_vertices = props.use_connected_vertex_threshold
+        if event.ctrl:
+            adjust_vertices = not adjust_vertices
+
+        if adjust_vertices:
+            step = max(1, int(round(max(1, props.max_connected_vertices) * 0.05)))
+            if event.shift:
+                step = max(1, step * 5)
+            props.max_connected_vertices = max(
+                1,
+                props.max_connected_vertices + step if grow else props.max_connected_vertices - step,
+            )
+            return
+
         step = max(0.5, props.angle_threshold * 0.05)
         if event.shift:
             step *= 5.0
-        if event.ctrl:
-            step *= 0.2
         props.angle_threshold = max(0.0, min(180.0, props.angle_threshold + step if grow else props.angle_threshold - step))
 
     def _selected_sets_from_preview(self):
@@ -527,6 +622,21 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         if batches.line_batch is not None:
             batches.line_batch.draw(shader)
         gpu.state.line_width_set(1.0)
+
+        if self._lock_points:
+            lock_points = []
+            for vert_index in self._lock_points:
+                vert = self._bm.verts[vert_index]
+                world_pos = self._obj.matrix_world @ vert.co
+                lock_points.append(world_pos)
+
+            if lock_points:
+                shader.uniform_float("color", (1.0, 0.2, 0.2, 0.9))
+                gpu.state.point_size_set(10.0)
+                lock_batch = batch_for_shader(shader, "POINTS", {"pos": lock_points})
+                lock_batch.draw(shader)
+                gpu.state.point_size_set(1.0)
+
         gpu.state.depth_test_set("NONE")
         gpu.state.blend_set("NONE")
 
@@ -536,11 +646,22 @@ class MESH_OT_smart_3d_magic_wand(Operator):
 
         props = context.scene.smart_3d_magic_wand
         region_size = len(self._preview.region.selected_faces) if self._preview.region else 0
+        region_vertices = len(self._preview.region.selected_vertices) if self._preview.region else 0
+        threshold_label = (
+            f"Verts {props.max_connected_vertices}"
+            if props.use_connected_vertex_threshold
+            else f"Angle {props.angle_threshold:.1f}°"
+        )
+        other_label = "angle" if props.use_connected_vertex_threshold else "verts"
+        lock_indicator = "🔒 LOCK MODE" if self._preview.lock_mode else "L lock mode"
 
         lines = [
-            f"Smart 3D Magic Wand  |  Threshold {props.angle_threshold:.1f}°  |  Region faces {region_size}",
-            f"Mode {self.selection_behavior}  |  LMB/Enter commit  |  Wheel adjust  |  Esc cancel",
+            f"Smart 3D Magic Wand  |  {threshold_label}  |  Faces {region_size}  |  Verts {region_vertices}",
+            f"Mode {self.selection_behavior}  |  Wheel active  |  Ctrl+Wheel {other_label}  |  Shift larger step  |  V toggle limit  |  {lock_indicator}  |  Esc cancel",
         ]
+
+        if self._lock_points:
+            lines.append(f"Lock points: {len(self._lock_points)}  |  C: clear locks")
 
         font_id = getattr(self, "_overlay_font_id", 0)
         x = 20

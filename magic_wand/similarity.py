@@ -30,6 +30,8 @@ class OutputMode(str, Enum):
 @dataclass(frozen=True, slots=True)
 class SimilaritySettings:
     angle_threshold: float = 35.0
+    use_connected_vertex_threshold: bool = False
+    max_connected_vertices: int = 256
     curvature_sensitivity: float = 0.75
     max_growth_distance: float = 1.0e6
     material_lock: bool = True
@@ -38,6 +40,8 @@ class SimilaritySettings:
     connected_only: bool = True
     tolerance_falloff: float = 0.35
     vertex_color_tolerance: float = 0.15
+    vertex_distance_bias: float = 0.5
+    lock_points: frozenset[int] = frozenset()
     use_face_normal: bool = True
     use_curvature: bool = True
     use_material: bool = True
@@ -84,27 +88,30 @@ def evaluate_transition(
     if settings.sharp_edge_blocking and neighbor.edge_sharp:
         return False, 0.0
 
-    if settings.use_face_normal:
-        if neighbor.dihedral_angle > _allowed_angle(settings, current_distance):
-            return False, 0.0
-
     curvature_delta = abs(analysis.face_curvatures[current_face] - analysis.face_curvatures[neighbor.face_index])
     curvature_limit = _curvature_limit(settings)
-    if settings.use_curvature and curvature_delta > curvature_limit:
-        return False, 0.0
-
     color_delta = neighbor.color_delta
+
+    if not settings.use_connected_vertex_threshold:
+        if settings.use_face_normal:
+            if neighbor.dihedral_angle > _allowed_angle(settings, current_distance):
+                return False, 0.0
+
+        if settings.use_curvature and curvature_delta > curvature_limit:
+            return False, 0.0
+
     if settings.use_vertex_color and color_delta > settings.vertex_color_tolerance:
         return False, 0.0
 
     score = 1.0
-    if settings.use_face_normal:
-        normal_score = 1.0 - _clamp(neighbor.dihedral_angle / max(settings.angle_threshold, 1e-6))
-        score *= _clamp(normal_score)
+    if not settings.use_connected_vertex_threshold:
+        if settings.use_face_normal:
+            normal_score = 1.0 - _clamp(neighbor.dihedral_angle / max(settings.angle_threshold, 1e-6))
+            score *= _clamp(normal_score)
 
-    if settings.use_curvature:
-        curvature_score = 1.0 - _clamp(curvature_delta / max(curvature_limit, 1e-6))
-        score *= _clamp(curvature_score)
+        if settings.use_curvature:
+            curvature_score = 1.0 - _clamp(curvature_delta / max(curvature_limit, 1e-6))
+            score *= _clamp(curvature_score)
 
     if settings.use_vertex_color:
         color_score = 1.0 - _clamp(color_delta / max(settings.vertex_color_tolerance, 1e-6))

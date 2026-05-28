@@ -8,8 +8,10 @@ Blender 4.x add-on for topology-aware mesh selection.
 1. Open a mesh in `Edit Mode`.
 2. Launch `Smart 3D Magic Wand` from the `Magic Wand` sidebar tab or the mesh menu.
 3. Hover a face, edge, or vertex and left-click to commit the region.
-4. Use the mouse wheel to grow or shrink the similarity threshold in real time.
-5. Use `A`, `S`, `R`, `I` to switch between add, subtract, replace, and intersect behavior.
+4. Use the toggle in the sidebar to choose the active wheel target.
+5. Use the mouse wheel to grow or shrink the active threshold in real time.
+6. Hold `Ctrl` while using the mouse wheel to adjust the other threshold.
+7. Use `A`, `S`, `R`, `I` to switch between add, subtract, replace, and intersect behavior.
 
 ## What it does
 
