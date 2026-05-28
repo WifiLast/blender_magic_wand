@@ -18,7 +18,7 @@ class SmartWandPreferences(AddonPreferences):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Smart 3D Magic Wand")
+        layout.label(text="3D Magic Wand")
         layout.label(text="Selection settings are stored per scene.")
 
 

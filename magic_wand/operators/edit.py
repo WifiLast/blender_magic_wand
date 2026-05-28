@@ -84,6 +84,12 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         default="REPLACE",
     )
 
+    show_advanced = bpy.props.BoolProperty(
+        name="Advanced Settings",
+        description="Show advanced threshold and sensitivity settings",
+        default=False,
+    )
+
     def invoke(self, context, event):
         obj = context.object
         if obj is None or obj.type != "MESH" or context.mode != "EDIT_MESH":
@@ -148,6 +154,18 @@ class MESH_OT_smart_3d_magic_wand(Operator):
                 self._toggle_lock_point(context, event)
                 context.area.tag_redraw()
                 return {"RUNNING_MODAL"}
+            elif event.ctrl:
+                preview_faces, preview_edges, preview_verts = self._selected_sets_from_preview()
+                current = self._capture_selection()
+                current_faces = current["faces"] | preview_faces
+                current_edges = current["edges"] | preview_edges
+                current_verts = current["verts"] | preview_verts
+                self._set_selection_from_sets(faces=current_faces, edges=current_edges, verts=current_verts)
+                bmesh.update_edit_mesh(self._obj.data, loop_triangles=False, destructive=False)
+                self._preview = _PreviewState()
+                self._preview_batches = _PreviewBatches()
+                context.area.tag_redraw()
+                return {"RUNNING_MODAL"}
             else:
                 self._apply_preview_selection(context)
                 self._finish(context)
@@ -206,17 +224,19 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         layout.use_property_split = True
         layout.use_property_decorate = False
         props = context.scene.smart_3d_magic_wand
-        layout.prop(self, "seed_mode")
-        layout.prop(self, "output_mode")
+
         layout.prop(self, "selection_behavior")
-        layout.separator()
-        layout.prop(props, "angle_threshold")
-        layout.prop(props, "use_connected_vertex_threshold", toggle=True)
-        layout.prop(props, "max_connected_vertices")
-        layout.prop(props, "vertex_distance_bias")
-        layout.prop(props, "curvature_sensitivity")
-        layout.prop(props, "max_growth_distance")
-        layout.prop(props, "tolerance_falloff")
+        layout.prop(self, "show_advanced", toggle=True)
+
+        if self.show_advanced:
+            box = layout.box()
+            box.prop(props, "angle_threshold")
+            box.prop(props, "use_connected_vertex_threshold", toggle=True)
+            box.prop(props, "max_connected_vertices")
+            box.prop(props, "vertex_distance_bias")
+            box.prop(props, "curvature_sensitivity")
+            box.prop(props, "max_growth_distance")
+            box.prop(props, "tolerance_falloff")
 
     @classmethod
     def poll(cls, context):
@@ -280,7 +300,7 @@ class MESH_OT_smart_3d_magic_wand(Operator):
             (
                 f"Smart 3D Magic Wand | {threshold_label} | "
                 f"Behavior: {self.selection_behavior} | Region faces: {region_size} | "
-                f"Region verts: {region_vertices} | Wheel: active | Ctrl+Wheel: {other_label} | "
+                f"Region verts: {region_vertices} | Click: select | Ctrl+Click: multi-select | Wheel: threshold | Ctrl+Wheel: {other_label} | "
                 f"A/S/R/I: add/subtract/replace/intersect | V: toggle vertex limit | L: lock mode{lock_mode_text}{lock_count_text}{clear_locks_text} | Esc: cancel"
             )
         )
