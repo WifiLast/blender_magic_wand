@@ -1,5 +1,6 @@
 # Smart 3D Magic Wand
 
+Not tested yet.!!!!
 Blender 4.x add-on for topology-aware mesh selection.
 
 ## Usage
