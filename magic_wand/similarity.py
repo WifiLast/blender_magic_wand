@@ -69,7 +69,7 @@ def _curvature_limit(settings: SimilaritySettings) -> float:
     return max(0.1, settings.angle_threshold * max(0.1, settings.curvature_sensitivity))
 
 
-def evaluate_transition(
+def can_grow_to_neighbor(
     analysis: MeshAnalysis,
     current_face: int,
     neighbor: FaceNeighbor,
@@ -124,7 +124,7 @@ def evaluate_transition(
     return score > 0.15, _clamp(score)
 
 
-def element_seed_indices(
+def initial_indices(
     analysis: MeshAnalysis,
     *,
     face_index: int,

@@ -4,7 +4,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from .analysis import MeshAnalysis
-from .similarity import SimilaritySettings, evaluate_transition
+from .similarity import SimilaritySettings, can_grow_to_neighbor
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +40,7 @@ def grow_region(
             if neighbor.face_index in queued:
                 continue
 
-            allowed, score = evaluate_transition(
+            allowed, score = can_grow_to_neighbor(
                 analysis,
                 face_index,
                 neighbor,
