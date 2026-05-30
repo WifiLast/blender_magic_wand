@@ -61,7 +61,11 @@ def grow_region(
                 candidate_vertices = set(analysis.face_vertex_indices[neighbor.face_index])
                 new_vertices = candidate_vertices - selected_vertices
 
-                distance_ratio = (current_distance + neighbor.edge_length) / max(settings.max_growth_distance, 1e-6) if settings.max_growth_distance > 0 else 0
+                distance_ratio = (
+                    (current_distance + neighbor.edge_length) / max(settings.max_growth_distance, 1e-6)
+                    if settings.max_growth_distance > 0
+                    else 0
+                )
                 distance_factor = 1.0 - (settings.vertex_distance_bias * distance_ratio)
                 effective_max = int(settings.max_connected_vertices * max(0.3, distance_factor))
 

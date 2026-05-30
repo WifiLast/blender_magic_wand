@@ -41,7 +41,9 @@ _PREVIEW_SHADER = None
 def _get_preview_shader():
     global _PREVIEW_SHADER
     if _PREVIEW_SHADER is None:
-        _PREVIEW_SHADER = gpu.shader.from_builtin("UNIFORM_COLOR" if bpy.app.version >= (4, 0, 0) else "3D_UNIFORM_COLOR")
+        _PREVIEW_SHADER = gpu.shader.from_builtin(
+            "UNIFORM_COLOR" if bpy.app.version >= (4, 0, 0) else "3D_UNIFORM_COLOR"
+        )
     return _PREVIEW_SHADER
 
 
@@ -300,8 +302,10 @@ class MESH_OT_smart_3d_magic_wand(Operator):
             (
                 f"Smart 3D Magic Wand | {threshold_label} | "
                 f"Behavior: {self.selection_behavior} | Region faces: {region_size} | "
-                f"Region verts: {region_vertices} | Click: select | Ctrl+Click: multi-select | Wheel: threshold | Ctrl+Wheel: {other_label} | "
-                f"A/S/R/I: add/subtract/replace/intersect | V: toggle vertex limit | L: lock mode{lock_mode_text}{lock_count_text}{clear_locks_text} | Esc: cancel"
+                f"Region verts: {region_vertices} | Click: select | Ctrl+Click: multi-select | "
+                f"Wheel: threshold | Ctrl+Wheel: {other_label} | "
+                f"A/S/R/I: add/subtract/replace/intersect | V: toggle vertex limit | "
+                f"L: lock mode{lock_mode_text}{lock_count_text}{clear_locks_text} | Esc: cancel"
             )
         )
 
@@ -510,7 +514,13 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         step = max(0.5, props.angle_threshold * 0.05)
         if event.shift:
             step *= 5.0
-        props.angle_threshold = max(0.0, min(180.0, props.angle_threshold + step if grow else props.angle_threshold - step))
+        props.angle_threshold = max(
+            0.0,
+            min(
+                180.0,
+                props.angle_threshold + step if grow else props.angle_threshold - step,
+            ),
+        )
 
     def _selected_sets_from_preview(self):
         if self._preview.region is None:
@@ -592,7 +602,12 @@ class MESH_OT_smart_3d_magic_wand(Operator):
         shader = _get_preview_shader()
         tri_batch = batch_for_shader(shader, "TRIS", {"pos": triangles}) if triangles else None
         line_batch = batch_for_shader(shader, "LINES", {"pos": outlines}) if outlines else None
-        self._preview_batches = _PreviewBatches(signature=signature, shader=shader, tri_batch=tri_batch, line_batch=line_batch)
+        self._preview_batches = _PreviewBatches(
+            signature=signature,
+            shader=shader,
+            tri_batch=tri_batch,
+            line_batch=line_batch,
+        )
 
     def _set_selection_from_sets(self, *, faces: set[int], edges: set[int], verts: set[int]):
         for face in self._bm.faces:
@@ -677,7 +692,10 @@ class MESH_OT_smart_3d_magic_wand(Operator):
 
         lines = [
             f"Smart 3D Magic Wand  |  {threshold_label}  |  Faces {region_size}  |  Verts {region_vertices}",
-            f"Mode {self.selection_behavior}  |  Wheel active  |  Ctrl+Wheel {other_label}  |  Shift larger step  |  V toggle limit  |  {lock_indicator}  |  Esc cancel",
+            (
+                f"Mode {self.selection_behavior}  |  Wheel active  |  Ctrl+Wheel {other_label}  |  "
+                f"Shift larger step  |  V toggle limit  |  {lock_indicator}  |  Esc cancel"
+            ),
         ]
 
         if self._lock_points:
@@ -700,10 +718,11 @@ class MESH_OT_smart_3d_magic_wand(Operator):
             (x - pad_x + width, y - pad_y + height),
             (x - pad_x, y - pad_y + height),
         ]
+        background_fill = [background[0], background[1], background[2], background[0], background[2], background[3]]
         gpu.state.blend_set("ALPHA")
         shader.bind()
         shader.uniform_float("color", (0.05, 0.05, 0.06, 0.72))
-        batch_for_shader(shader, "TRIS", {"pos": background[:3] + [background[0], background[2], background[3]]}).draw(shader)
+        batch_for_shader(shader, "TRIS", {"pos": background_fill}).draw(shader)
         shader.uniform_float("color", (0.95, 0.84, 0.18, 0.90))
         batch_for_shader(shader, "LINE_STRIP", {"pos": background + [background[0]]}).draw(shader)
         gpu.state.blend_set("NONE")
