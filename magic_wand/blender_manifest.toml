@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 id = "magic_wand"
 name = "Magic Wand"
-version = "0.0.1"
+version = "0.0.2"
 tagline = "Topology-aware mesh selection"
 maintainer = "Wiffzackius"
 type = "add-on"
